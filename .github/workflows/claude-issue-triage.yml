@@ -56,7 +56,8 @@ jobs:
             Only add labels that are clearly appropriate. Do not spam labels.
 
             ## Step 5 — Publish diagnosis comment
-            Write a structured diagnosis in Spanish (the project language) with this exact markdown format:
+            Write a structured diagnosis in Spanish (the project language) with this exact markdown format.
+            IMPORTANT: The comment body must be valid GitHub Flavored Markdown (GFM) so GitHub renders it correctly — use proper heading levels (`##`, `###`), fenced code blocks with backticks, bold with `**`, and bullet lists with `-`. Do NOT use any HTML tags other than the `<!-- claude-triage -->` marker. Escape backticks inside inline code if needed.
 
             ```
             <!-- claude-triage -->
