@@ -1,0 +1,94 @@
+name: Claude Issue Triage
+
+on:
+  issues:
+    types: [opened, edited]
+
+jobs:
+  triage:
+    # Skip bot-triggered events to avoid loops
+    if: github.actor != 'github-actions[bot]' && github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude Issue Triage
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: '--allowed-tools "Bash(gh issue view:*),Bash(gh issue edit:*),Bash(gh issue comment:*),Bash(gh label list:*),Bash(gh issue comment list:*)"'
+          prompt: |
+            You are a GitHub issue triage assistant for a Tetris game repository.
+
+            The repository has three files:
+            - `game.js` — all game logic (~305 lines): pieces, collision, rotation, scoring, rendering, game loop
+            - `index.html` — DOM structure: board canvas (300×600px), next-piece preview canvas, overlay for pause/game-over
+            - `style.css` — dark/retro aesthetic, flexbox layout
+
+            Your task is to triage issue #${{ github.event.issue.number }} in the repository ${{ github.repository }}.
+
+            Follow these steps IN ORDER:
+
+            ## Step 1 — Read the issue
+            Run: `gh issue view ${{ github.event.issue.number }} --repo ${{ github.repository }}`
+
+            ## Step 2 — Check for existing triage comment
+            Run: `gh issue comment list ${{ github.event.issue.number }} --repo ${{ github.repository }} --json body,id`
+            Look for any comment that contains the exact string `<!-- claude-triage -->`.
+            - If found, note the comment ID — you will UPDATE it (not create a new one).
+            - If not found, you will CREATE a new comment.
+
+            ## Step 3 — List available labels
+            Run: `gh label list --repo ${{ github.repository }}`
+            You MUST only assign labels that already exist in the repo. Do NOT invent new labels.
+
+            ## Step 4 — Assign labels
+            Based on the issue content, choose the most relevant label(s) from the existing ones.
+            Apply them with: `gh issue edit ${{ github.event.issue.number }} --repo ${{ github.repository }} --add-label "label1,label2"`
+            Only add labels that are clearly appropriate. Do not spam labels.
+
+            ## Step 5 — Publish diagnosis comment
+            Write a structured diagnosis in Spanish (the project language) with this exact markdown format:
+
+            ```
+            <!-- claude-triage -->
+            ## 🔍 Diagnóstico del Issue
+
+            **Resumen:** <one-line summary of the problem>
+
+            **Tipo:** <Bug / Mejora / Pregunta / Documentación / Otro>
+
+            **Área(s) del código afectadas:**
+            - `<filename>` — <which function/section and why>
+
+            **Causa probable:**
+            <2-4 sentences explaining the root cause or likely source of the issue>
+
+            **Análisis técnico:**
+            <Deeper technical detail referencing specific functions from game.js if relevant (e.g., `tryRotate()`, `collide()`, `clearLines()`, `draw()`, etc.)>
+
+            **Pasos sugeridos para la solución:**
+            1. <Step 1>
+            2. <Step 2>
+            3. <Step 3 if needed>
+
+            ---
+            *Diagnóstico generado automáticamente por Claude. Sirve como base para implementar la solución.*
+            ```
+
+            - If creating a NEW comment: `gh issue comment ${{ github.event.issue.number }} --repo ${{ github.repository }} --body "<the markdown above>"`
+            - If UPDATING an existing comment: `gh api --method PATCH repos/${{ github.repository }}/issues/comments/<COMMENT_ID> -f body="<the markdown above>"`
+
+            Important rules:
+            - Never edit the issue body
+            - Never create more than one triage comment
+            - Always include `<!-- claude-triage -->` at the very top of the comment so future runs can find it
+            - Only assign labels that exist in the repo
